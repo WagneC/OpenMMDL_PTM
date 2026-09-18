@@ -42,6 +42,8 @@ from openff.interchange.components._packmol import (
     solvate_topology,
 ) # NEW
 from openff.units import Quantity # NEW
+from openff.toolkit.typing.engines.smirnoff import ForceField as SMIRNOFFForceField
+from openff.toolkit.topology import Molecule
 
 
 # Input Files
@@ -79,11 +81,6 @@ PTMresdef = ResidueDefinition.react(
 )[0][0] # Returns a list of tuples, we want the first (and only) element of any (identical) tuple
 
 
-############# Forcefield, Water and Membrane Model Selection ###################
-
-ff = 'OPENFF3' # einzig mögliches bissher 
-water = 'OPC3'
-
 ############# Water Box Settings ###################
 
 add_membrane = False
@@ -100,7 +97,7 @@ ewaldErrorTolerance = 0.0005
 constraints = app.HBonds
 rigidWater = True
 constraintTolerance = 0.000001
-hydrogenMass = 1.5*unit.amu
+hydrogenMass = 1.5  # habe unit.amu rausgenommen
 
 # Integration Options
 
@@ -131,21 +128,6 @@ checkpointReporter100 = CheckpointReporter('100x_checkpoint.chk', checkpointInte
 
 
 
-# Prepare the FF
-
-protein_pdb = PDBFile(protein)     
-forcefield_selected = ff_selection(ff)
-water_selected = water_forcefield_selection(water=water,forcefield_selection=ff_selection(ff))
-model_water = water_model_selection(water=water,forcefield_selection=ff_selection(ff))
-print("Forcefield and Water Model Selected")
-if water_selected != None:
-    forcefield = generate_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None) 
-else:
-    forcefield = app.ForceField(forcefield_selected)    
-if add_membrane:
-        transitional_forcefield = generate_transitional_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)     
-
-forcefield = generate_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)        
 
 # Prepare the OpenFF topology
 
@@ -153,7 +135,7 @@ topology_openff = topology_from_pdb(
     protein,
     additional_definitions=[PTMresdef],
 )
-print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
+
 
 
 
@@ -171,6 +153,13 @@ topology_openff = solvate_topology(
     box_shape=UNIT_CUBE,
 )
 
+# Prepare the FF
+
+protein_pdb = PDBFile(protein) 
+
+forcefield_selected = "openff_no_water-3.0.0-alpha0.offxml"        # "openff_no_water-3.0.0-alpha0.offxml"
+water_selected = "opc3.offxml"           # 
+model_water = "opc3"     
 
 
 
@@ -195,6 +184,12 @@ system = interchange.to_openmm_system(
     ewald_tolerance=ewaldErrorTolerance,
 )
 topology = interchange.to_openmm_topology()
+for res in topology.residues():         # Bugfix
+    res.id = str(res.id) 
+for chain in topology.chains():
+    chain.id = str(chain.id)
+    
+
 positions = interchange.positions.to_openmm()
 positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.nanometers
 

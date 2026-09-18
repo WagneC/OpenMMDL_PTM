@@ -1,6 +1,8 @@
 from openff.toolkit.topology import Molecule
 from openmmforcefields.generators import GAFFTemplateGenerator, SMIRNOFFTemplateGenerator
 from openmm import app
+from openff.toolkit.typing.engines.smirnoff import ForceField as SMIRNOFFForceField
+from openff.toolkit.topology import Molecule
 
 
 def _to_openff_molecules(rdkit_mol):
@@ -102,6 +104,9 @@ def water_forcefield_selection(water, forcefield_selection):
                 "TIP5P": "charmm36_2024/tip5p.xml",
                 "TIP5P-Ew": "charmm36_2024/tip5pew.xml",
             },
+            "openff_no_water-3.0.0-alpha0.offxml": {
+                "OPC3": "openff_no_water-3.0.0-alpha0/opc3.offxml",
+            }
         }
         water_model = water_forcefields.get(forcefield_selection, {}).get(water, None)
 
@@ -184,31 +189,43 @@ def generate_forcefield(
     """
     old_amber = {"amber99sb.xml", "amber99sbildn.xml", "amber03.xml", "amber10.xml"}
 
-    # For older amber forcefields, the additional lipid17.xml is required for templates
-    if add_membrane:
-        if protein_ff in old_amber:
-            forcefield = app.ForceField(protein_ff, solvent_ff, "amber14/lipid17.xml")
+    if protein_ff.endswith(".offxml"):
+        sage_ff14sb = SMIRNOFFForceField(protein_ff, "opc3.offxml")
+        water_molecule = Molecule.from_smiles("O")
+        molecules = [protein_molecule, water_molecule]
+
+        forcefield = app.ForceField()  # leer - alles kommt über den SMIRNOFF-Generator
+        smirnoff = SMIRNOFFTemplateGenerator(molecules=molecules, forcefield=sage_ff14sb)
+        forcefield.registerTemplateGenerator(smirnoff.generator)
+
+        return forcefield
+
+    else:
+        # For older amber forcefields, the additional lipid17.xml is required for templates
+        if add_membrane:
+            if protein_ff in old_amber:
+                forcefield = app.ForceField(protein_ff, solvent_ff, "amber14/lipid17.xml")
+            else:
+                forcefield = app.ForceField(protein_ff, solvent_ff)
         else:
             forcefield = app.ForceField(protein_ff, solvent_ff)
-    else:
-        forcefield = app.ForceField(protein_ff, solvent_ff)
-    # If a ligand is present, a Forcefield with GAFF or SMIRNOFF will be created for the ligand
-    if rdkit_mol is not None:
-        openff_molecules = _to_openff_molecules(rdkit_mol)
-        if smallMoleculeForceField == "gaff":
-            gaff = GAFFTemplateGenerator(
-                molecules=openff_molecules,
-                forcefield=smallMoleculeForceFieldVersion,
-            )
-            forcefield.registerTemplateGenerator(gaff.generator)
-        elif smallMoleculeForceField == "smirnoff":
-            smirnoff = SMIRNOFFTemplateGenerator(
-                molecules=openff_molecules,
-                forcefield=smallMoleculeForceFieldVersion,
-            )
-            forcefield.registerTemplateGenerator(smirnoff.generator)
+        # If a ligand is present, a Forcefield with GAFF or SMIRNOFF will be created for the ligand
+        if rdkit_mol is not None:
+            openff_molecules = _to_openff_molecules(rdkit_mol)
+            if smallMoleculeForceField == "gaff":
+                gaff = GAFFTemplateGenerator(
+                    molecules=openff_molecules,
+                    forcefield=smallMoleculeForceFieldVersion,
+                )
+                forcefield.registerTemplateGenerator(gaff.generator)
+            elif smallMoleculeForceField == "smirnoff":
+                smirnoff = SMIRNOFFTemplateGenerator(
+                    molecules=openff_molecules,
+                    forcefield=smallMoleculeForceFieldVersion,
+                )
+                forcefield.registerTemplateGenerator(smirnoff.generator)
 
-    return forcefield
+        return forcefield
 
 
 def generate_transitional_forcefield(

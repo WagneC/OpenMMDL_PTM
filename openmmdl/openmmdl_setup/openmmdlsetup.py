@@ -1401,6 +1401,15 @@ def configureDefaultOptions():
     session["pml_generation"] = "True"
     session["stable_water"] = "Yes"
     session["wc_distance"] = "1.0"
+    session["wc_distance"] = "1.0"
+    # --- PTM Residue Settings ---
+    session["ptmMode"] = False 
+    session["ptmLigandFile"] = ""
+    session["ptmResName"] = ""
+    session["ptmResSmiles"] = ""
+    session["ptmLigSmiles"] = "" 
+    session["ptmProductSmiles"] = ""
+    # ---------------------------
     if session["fileType"] == "pdb" and session["waterModel"] == "implicit":
         implicitWater = True
     session["ensemble"] = "nvt" if implicitWater else "npt"
