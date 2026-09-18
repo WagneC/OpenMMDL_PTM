@@ -29,6 +29,7 @@ def ff_selection(ff):
         "AMBER10": "amber10.xml",
         "CHARMM36": "charmm36.xml",
         "CHARMM2024": "charmm36_2024.xml",
+        "OPENFF3": "openff_no_water-3.0.0-alpha0.offxml"
     }
 
     return forcefield_dict.get(ff, None)
