@@ -24,6 +24,14 @@ Select the pdb input file and options for how to model it.
         <div class="col-md-10">{{ fileinput('file', accept='.pdb') }}</div>
     </div>
     <div class="form-group">
+    <label class="control-label col-md-2">PTM Residue Mode</label>
+        <div class="col-md-10">
+            <label class="checkbox-inline" style="font-weight: 400;">
+                <input type="checkbox" name="ptmMode" id="ptmMode" onchange="optionChanged()"> Enable PTM residue mode
+            </label>
+        </div>
+    </div>
+    <div class="form-group">
     <label for="forcefield" class="control-label col-md-2">Force Field</label>
     <div class="col-md-10"><select name="forcefield" id="forcefield" class="form-control" title="CHARMM force field does not support ligands. Select Amber force fields for ligand-protein MD simulations" onchange="optionChanged()">
         <option value="AMBER19">AMBER19</option>
@@ -34,11 +42,39 @@ Select the pdb input file and options for how to model it.
         <option value="AMBER10">AMBER10</option>
         <option value="CHARMM36">CHARMM36</option>
         <option value="CHARMM2024">CHARMM36 2024</option>
+        <option value="OPENFF3">OpenFF 3.0 (PTM)</option>
     </select></div>
     </div>
     <div id="waterModelRow" class="form-group">
         <label for="waterModel" class="control-label col-md-2">Water Model</label>
         <div class="col-md-10"><select name="waterModel" id="waterModel" class="form-control" title="TIP3P, TIP3P-FB and SPC/E are the most tested water models in OpenMMDL "></select></div>
+    </div>
+    <div id="ptmSection" hidden>
+        <div class="form-group">
+            <label for="filename" class="control-label col-md-2">Ligand File (PTM)</label>
+            <div class="col-md-10" title="SDF of the modifying group reacted onto the residue (e.g. maleimide.sdf)">{{ fileinput('ptmLigandFile', accept='.sdf') }}</div>
+        </div>
+        <div class="form-group">
+            <label for="ptmResName" class="control-label col-md-2">Residue Name</label>
+            <div class="col-md-10">
+                <input type="text" name="ptmResName" id="ptmResName" class="form-control om-resname-input"
+                    value="CYS" data-default-resname="CYS" maxlength="3" pattern="[A-Z0-9]{3}"
+                    oninput="updateResnameInput(this, 'CYS')" onblur="updateResnameInput(this, 'CYS', true)"/>
+                <p class="help-block">Standard-3-Letter-Code des zu modifizierenden Rests (muss im CCD-Cache existieren), z.B. CYS.</p>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="ptmResSmiles" class="control-label col-md-2">Residue SMARTS</label>
+            <div class="col-md-10"><input type="text" name="ptmResSmiles" id="ptmResSmiles" class="form-control" placeholder="[C:10]-[S:1]-[H:2]"/></div>
+        </div>
+        <div class="form-group">
+            <label for="ptmLigSmiles" class="control-label col-md-2">Modification SMARTS</label>
+            <div class="col-md-10"><input type="text" name="ptmLigSmiles" id="ptmLigSmiles" class="form-control" placeholder="[N:3]1-[C:4](=[O:5])-...-1"/></div>
+        </div>
+        <div class="form-group">
+            <label for="ptmProductSmiles" class="control-label col-md-2">Product SMARTS</label>
+            <div class="col-md-10"><input type="text" name="ptmProductSmiles" id="ptmProductSmiles" class="form-control" placeholder="[N:3]1-[C:4](=[O:5])-...-1"/></div>
+        </div>
     </div>
     <p>
     Optional: configure small molecules for a single complex or for a pose library workflow.
@@ -223,6 +259,29 @@ var amoebaWaterModels = [
         ["Implicit", "Implicit", false]
 ]
 
+var standardForcefields = [
+        ["AMBER19", "AMBER19", false],
+        ["AMBER14", "AMBER14", true],
+        ["AMBER99SB", "AMBER99SB", false],
+        ["AMBER99SB-ILDN", "AMBER99SB-ILDN", false],
+        ["AMBER03", "AMBER03", false],
+        ["AMBER10", "AMBER10", false],
+        ["CHARMM36", "CHARMM36", false],
+        ["CHARMM2024", "CHARMM36 2024", false],
+]
+
+// PTM-fähige Kraftfelder — hier später weitere ergänzen
+var ptmForcefields = [
+        ["OPENFF3", "OpenFF 3.0 (PTM)", true],
+]
+
+// Erlaubte Wassermodelle je PTM-Kraftfeld — hier später weitere Einträge ergänzen
+var ptmWaterModels = {
+    "OPENFF3": [
+        ["OPC3", "OPC3", true],
+    ],
+}
+
 var companionRowCount = 0;
 
 function defaultCompanionResname(index) {
@@ -307,17 +366,35 @@ function removeCompanionRow(index) {
 var lastForcefield = null;
 
 function optionChanged() {
-    // Update UI elements.
+    // -------------------------
+    // PTM mode (Checkbox, muss vor Forcefield-Filter bekannt sein)
+    // -------------------------
+    ptmMode = document.getElementById("ptmMode").checked;
 
     // -------------------------
     // Forcefield / Water model
     // -------------------------
-    forcefield = document.getElementById("forcefield").value;
+    forcefieldSelect = document.getElementById("forcefield");
     waterSelect = document.getElementById("waterModel");
 
+    for (i = 0; i < forcefieldSelect.options.length; i++) {
+        opt = forcefieldSelect.options[i];
+        isPtmOption = ptmForcefieldValues.includes(opt.value);
+        opt.hidden = ptmMode ? !isPtmOption : isPtmOption;
+    }
+
+    if (forcefieldSelect.options[forcefieldSelect.selectedIndex].hidden) {
+        for (i = 0; i < forcefieldSelect.options.length; i++) {
+            if (!forcefieldSelect.options[i].hidden) {
+                forcefieldSelect.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    forcefield = forcefieldSelect.value;
     forcefieldChanged = lastForcefield !== forcefield;
 
-    // If you inject waterModel from the server, use it once; otherwise keep current selection
     currentWater = waterSelect.value;
     if (typeof waterModel !== "undefined" && waterModel) {
         currentWater = waterModel;
@@ -330,7 +407,9 @@ function optionChanged() {
     else {
         document.getElementById("waterModelRow").hidden = false;
 
-        if (forcefield == "AMBER14")
+        if (ptmMode)
+            models = ptmWaterModels[forcefield] || [];
+        else if (forcefield == "AMBER14")
             models = newAmberWaterModels;
         else if (forcefield == "AMBER19")
             models = newAmberWaterModels;
@@ -362,7 +441,6 @@ function optionChanged() {
                 waterSelect.selectedIndex = i;
     }
 
-    // clear injected waterModel so user changes persist
     if (typeof waterModel !== "undefined" && waterModel) {
         waterModel = "";
     }
@@ -512,6 +590,23 @@ function optionChanged() {
         highThroughputHint.hidden = false;
     }
 
+    // -------------------------
+    // PTM mode UI
+    // -------------------------
+    ptmSection = document.getElementById("ptmSection");
+    smallMoleculeModeSelect = document.getElementById("smallMoleculeMode");
+
+    if (ptmMode) {
+        ptmSection.hidden = false;
+        smallMoleculeModeSelect.value = "none";
+        smallMoleculeModeSelect.disabled = true;
+        variableLigandSection.hidden = true;
+        companionSection.hidden = true;
+        highThroughputHint.hidden = true;
+    } else {
+        ptmSection.hidden = true;
+        smallMoleculeModeSelect.disabled = false;
+    }
 
     // -------------------------
     // File labels + submit state
@@ -565,9 +660,20 @@ function optionChanged() {
         duplicateWarning.style.display = duplicateResnames ? "block" : "none";
 
     document.getElementById('continue').disabled = !document.getElementById("file").value || invalidResnames || duplicateResnames;
+        ptmFileInput = document.getElementById("ptmLigandFile");
+    ptmFiles = ptmFileInput ? ptmFileInput.files : null;
+    document.getElementById("ptmLigandFile_label").textContent = (!ptmFiles || ptmFiles.length == 0 ? "" : ptmFiles[0].name);
+
+    ptmInvalid = ptmMode && (
+        !ptmFiles || ptmFiles.length == 0
+        || !document.getElementById("ptmResSmiles").value.trim()
+        || !document.getElementById("ptmLigSmiles").value.trim()
+        || !document.getElementById("ptmProductSmiles").value.trim()
+    );
+
+    document.getElementById('continue').disabled = !document.getElementById("file").value || invalidResnames || duplicateResnames || ptmInvalid;
 }
 
 optionChanged();
 </script>
 {% endblock %}
-

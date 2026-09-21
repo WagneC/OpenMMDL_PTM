@@ -1,4 +1,4 @@
-name: openmmdl  # Name of the Conda environment
+name: openmmdl_ptm_v1  # Name of the Conda environment
 
 channels:
   - conda-forge  # Add the conda-forge channel here
@@ -6,6 +6,7 @@ channels:
 
 dependencies:
   - pip
+  - python=3.12
   - setuptools>=61.0
   - versioningit~=2.0
   - sqlite>=3.40
@@ -32,5 +33,11 @@ dependencies:
   - numba>=0.59.1
   - jupyter
   - prolif>=2.1.0
+  - openff-toolkit
+  - openff-interchange
+  - openff-units
   # Add any additional runtime dependencies from pyproject.toml here
   # - package_name=version
+
+# additional dependencies 
+# pip install git+https://github.com/openforcefield/openff-pablo.git@v0.2.2

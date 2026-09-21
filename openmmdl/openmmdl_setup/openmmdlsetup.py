@@ -1204,6 +1204,7 @@ def showAddHydrogens():
         unitCell=unitCell,
         boundingBox=boundingBox,
         tutorial_page="add_hydrogens",
+        ptm_mode=session.get("ptmMode", False),
     )
 
 
@@ -1228,7 +1229,7 @@ def addHydrogens():
         session["water_ionicstrength"] = float(request.form["ionicstrength"])
         session["water_positive"] = request.form["positiveion"] + "+"
         session["water_negative"] = request.form["negativeion"] + "-"
-    elif "addMembrane" in request.form:
+    elif "addMembrane" in request.form and not session.get("ptmMode"):
         session["solvent"] = True
         session["add_membrane"] = True
         session["lipidType"] = request.form["lipidType"]

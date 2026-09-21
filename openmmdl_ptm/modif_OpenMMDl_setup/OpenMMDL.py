@@ -46,9 +46,8 @@ from openff.toolkit.typing.engines.smirnoff import ForceField as SMIRNOFFForceFi
 from openff.toolkit.topology import Molecule
 
 
-# Input Files
+
 ############# Ligand and Protein Data ###################
-########   Add the Ligand SDF File and Protein PDB File in the Folder with the Script  ######### 
 
 protein = "3ip9_dye-processed_openMMDL.pdb"
 ligand = "maleimide.sdf" # NEW
@@ -60,8 +59,12 @@ RESsmiles = "[C:10]-[S:1]-[H:2]"    # NEW
 LIGsmiles = "[N:3]1-[C:4](=[O:5])-[C:6](-[H:11])=[C:7](-[H:12])-[C:8](=[O:9])-1"    # NEW
 PTMsmiles = "[N:3]1-[C:4](=[O:5])-[C:6](-[H:2])(-[H:11])-[C@:7](-[S:1]-[C:10])(-[H:12])-[C:8](=[O:9])-1"  # NEW
 
+ff = "OPENFF3"
+water_ff = "OPC3"
 
 ############# PTM Residue Definition ####################################
+
+# hier FUnktion draus machen get_ptm_definition(RESname, RESsmiles, LIGsmiles, PTMsmiles)
 
 LIGresdef = ResidueDefinition.anon_from_sdf(ligand)
 # Get RESresdef from standard CCD cache
@@ -136,9 +139,6 @@ topology_openff = topology_from_pdb(
     additional_definitions=[PTMresdef],
 )
 
-
-
-
 # Solvate with the OpenFF PackMOL wrapper
 # Hier muss ich noch einlesen wie ich die Solvatisierung mit OpenFF PackMOL durchführe
 # Padding, Cubic box, feste size Cubic box etc einfügen 
@@ -156,11 +156,9 @@ topology_openff = solvate_topology(
 # Prepare the FF
 
 protein_pdb = PDBFile(protein) 
-
-forcefield_selected = "openff_no_water-3.0.0-alpha0.offxml"        # "openff_no_water-3.0.0-alpha0.offxml"
-water_selected = "opc3.offxml"           # 
-model_water = "opc3"     
-
+forcefield_selected = ff_selection(ff) # Protein
+water_selected = water_forcefield_selection(water_ff, forcefield_selected)
+forcefield = generate_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)        
 
 
 ############# Parameterize PTM #####################
@@ -172,8 +170,6 @@ model_water = "opc3"
 
 sage_ff14sb = ForceField(forcefield_selected, water_selected)
 interchange = sage_ff14sb.create_interchange(topology_openff)
-
-# Wechsel von OpenFF zu OpenMM interchange.to_openmm_simulation(...) 
 
 # Prepare the Simulation
 
