@@ -304,6 +304,7 @@ def configureFiles():
         if not _resnames_are_unique(all_resnames):
             raise ValueError("Ligand topology codes must be unique.")
         configureDefaultOptions()
+        session["ptmMode"] = "ptmMode" in request.form
         file, name = uploadedFiles["file"][0]
         file.seek(0, 0)
         session["pdbType"] = _guessFileFormat(file, name)

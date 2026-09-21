@@ -51,16 +51,19 @@ Select the pdb input file and options for how to model it.
     </div>
     <div id="ptmSection" hidden>
         <div class="form-group">
-            <label for="filename" class="control-label col-md-2">Ligand File (PTM)</label>
-            <div class="col-md-10" title="SDF of the modifying group reacted onto the residue (e.g. maleimide.sdf)">{{ fileinput('ptmLigandFile', accept='.sdf') }}</div>
-        </div>
+            <label for="filename" class="control-label col-md-2">Ligand File</label>
+                <div class="col-md-10" title="SDF file of the small molecule ligand">
+                    {{ fileinput('ptmLigandFile', accept='.sdf') }}
+                    <p class="help-block">SDF file of the small molecule ligand</p>
+                </div>
+            </div>
         <div class="form-group">
             <label for="ptmResName" class="control-label col-md-2">Residue Name</label>
             <div class="col-md-10">
                 <input type="text" name="ptmResName" id="ptmResName" class="form-control om-resname-input"
                     value="CYS" data-default-resname="CYS" maxlength="3" pattern="[A-Z0-9]{3}"
                     oninput="updateResnameInput(this, 'CYS')" onblur="updateResnameInput(this, 'CYS', true)"/>
-                <p class="help-block">Standard-3-Letter-Code des zu modifizierenden Rests (muss im CCD-Cache existieren), z.B. CYS.</p>
+                <p class="help-block">Standard 3-letter code of the residue to be modified</p>
             </div>
         </div>
         <div class="form-group">
@@ -68,7 +71,7 @@ Select the pdb input file and options for how to model it.
             <div class="col-md-10"><input type="text" name="ptmResSmiles" id="ptmResSmiles" class="form-control" placeholder="[C:10]-[S:1]-[H:2]"/></div>
         </div>
         <div class="form-group">
-            <label for="ptmLigSmiles" class="control-label col-md-2">Modification SMARTS</label>
+            <label for="ptmLigSmiles" class="control-label col-md-2">Ligand SMARTS</label>
             <div class="col-md-10"><input type="text" name="ptmLigSmiles" id="ptmLigSmiles" class="form-control" placeholder="[N:3]1-[C:4](=[O:5])-...-1"/></div>
         </div>
         <div class="form-group">
@@ -76,104 +79,108 @@ Select the pdb input file and options for how to model it.
             <div class="col-md-10"><input type="text" name="ptmProductSmiles" id="ptmProductSmiles" class="form-control" placeholder="[N:3]1-[C:4](=[O:5])-...-1"/></div>
         </div>
     </div>
-    <p>
-    Optional: configure small molecules for a single complex or for a pose library workflow.
-    </p>
-    <div class="form-group">
-    <label for="smallMoleculeMode" class="control-label col-md-2">Small Molecule Mode</label>
-    <div class="col-md-10"><select name="smallMoleculeMode" id="smallMoleculeMode" class="form-control" title="Choose whether to prepare a single complex, a multiple poses for high-throughput generation, or no small molecules" onchange="optionChanged()">
-        <option value="none" selected>No small molecules</option>
-        <option value="single">Single complex</option>
-        <option value="library">High-throughput / Multiple poses</option>
-    </select></div>
-    </div>
-    <div id="variableLigandSection" hidden>
+
+    <div id="smallMoleculeSection">
+        <p>
+        Optional: configure small molecules for a single complex or for a pose library workflow.
+        </p>
         <div class="form-group">
-        <label for="filename" class="control-label col-md-2">Ligand File</label>
-            <div class="col-md-10" title="For single complex mode upload one SDF, MOL or MOL2. For high-throughput mode upload one multi-entry SDF."> {{ fileinput('sdfFile', accept='.sdf,.mol,.mol2') }}</div>
+        <label for="smallMoleculeMode" class="control-label col-md-2">Small Molecule Mode</label>
+        <div class="col-md-10"><select name="smallMoleculeMode" id="smallMoleculeMode" class="form-control" title="Choose whether to prepare a single complex, a multiple poses for high-throughput generation, or no small molecules" onchange="optionChanged()">
+            <option value="none" selected>No small molecules</option>
+            <option value="single">Single complex</option>
+            <option value="library">High-throughput / Multiple poses</option>
+        </select></div>
         </div>
-        <div class="form-group">
-            <label for="sdfResname" class="control-label col-md-2">Topology Code</label>
-            <div class="col-md-10">
-                <input
-                    type="text"
-                    name="sdfResname"
-                    id="sdfResname"
-                    class="form-control om-resname-input"
-                    value="UNK"
-                    data-default-resname="UNK"
-                    maxlength="3"
-                    pattern="[A-Z0-9]{3}"
-                    oninput="updateResnameInput(this, 'UNK')"
-                    onblur="updateResnameInput(this, 'UNK', true)"
-                />
-                <p class="help-block">Topology residue code. Use exactly 3 uppercase letters or digits. Default: UNK.</p>
+        <div id="variableLigandSection" hidden>
+            <div class="form-group">
+            <label for="filename" class="control-label col-md-2">Ligand File</label>
+                <div class="col-md-10" title="For single complex mode upload one SDF, MOL or MOL2. For high-throughput mode upload one multi-entry SDF."> {{ fileinput('sdfFile', accept='.sdf,.mol,.mol2') }}</div>
+            </div>
+            <div class="form-group">
+                <label for="sdfResname" class="control-label col-md-2">Topology Code</label>
+                <div class="col-md-10">
+                    <input
+                        type="text"
+                        name="sdfResname"
+                        id="sdfResname"
+                        class="form-control om-resname-input"
+                        value="UNK"
+                        data-default-resname="UNK"
+                        maxlength="3"
+                        pattern="[A-Z0-9]{3}"
+                        oninput="updateResnameInput(this, 'UNK')"
+                        onblur="updateResnameInput(this, 'UNK', true)"
+                    />
+                    <p class="help-block">Topology residue code. Use exactly 3 uppercase letters or digits. Default: UNK.</p>
+                </div>
             </div>
         </div>
-    </div>
-    <div id="companionSection" hidden>
-        <div class="form-group">
-            <label class="control-label col-md-2">Additional Molecules</label>
-            <div class="col-md-10">
-                <div id="companionFilesContainer"></div>
-                <button type="button" id="addCompanionMolecule" class="btn btn-default" onclick="addCompanionRow()">+ Add additional molecule</button>
-                <p class="help-block" style="margin-top: 8px;">Each additional molecule is included in every generated system. Use one file per molecule. Default codes are L01, L02, L03, ...</p>
-                <p id="resnameDuplicateWarning" class="help-block om-resname-warning" style="display: none;">
-                    Ligand topology codes must be unique. Please change duplicate values before continuing.
-                </p>
+        <div id="companionSection" hidden>
+            <div class="form-group">
+                <label class="control-label col-md-2">Additional Molecules</label>
+                <div class="col-md-10">
+                    <div id="companionFilesContainer"></div>
+                    <button type="button" id="addCompanionMolecule" class="btn btn-default" onclick="addCompanionRow()">+ Add additional molecule</button>
+                    <p class="help-block" style="margin-top: 8px;">Each additional molecule is included in every generated system. Use one file per molecule. Default codes are L01, L02, L03, ...</p>
+                    <p id="resnameDuplicateWarning" class="help-block om-resname-warning" style="display: none;">
+                        Ligand topology codes must be unique. Please change duplicate values before continuing.
+                    </p>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="form-group">
-    <label for="smallMoleculeForceField" class="control-label col-md-2">Small Molecule Force Field</label>
-    <div class="col-md-10"><select name="smallMoleculeForceField" id="smallMoleculeForceField" class="form-control" title="Select the preferred small molecule force field" onchange="optionChanged()">
-        <option value="gaff" selected>GAFF</option>
-        <option value="smirnoff">SMIRNOFF</option>
-    </select></div>
-    </div>
-    <div id="gaffVersionRow" class="form-group" hidden>
-        <label for="gaffVersion" class="control-label col-md-2">GAFF Version</label>
-        <div class="col-md-10">
-            <select name="gaffVersion" id="gaffVersion" class="form-control" onchange="optionChanged()"></select>
+        <div class="form-group">
+        <label for="smallMoleculeForceField" class="control-label col-md-2">Small Molecule Force Field</label>
+        <div class="col-md-10"><select name="smallMoleculeForceField" id="smallMoleculeForceField" class="form-control" title="Select the preferred small molecule force field" onchange="optionChanged()">
+            <option value="gaff" selected>GAFF</option>
+            <option value="smirnoff">SMIRNOFF</option>
+        </select></div>
+        </div>
+        <div id="gaffVersionRow" class="form-group" hidden>
+            <label for="gaffVersion" class="control-label col-md-2">GAFF Version</label>
+            <div class="col-md-10">
+                <select name="gaffVersion" id="gaffVersion" class="form-control" onchange="optionChanged()"></select>
+            </div>
+        </div>
+
+        <div id="smirnoffConstraintRow" class="form-group" hidden>
+            <label for="openffConstraint" class="control-label col-md-2">SMIRNOFF Mode</label>
+            <div class="col-md-10">
+                <select name="openffConstraint" id="openffConstraint" class="form-control" onchange="optionChanged()">
+                    <option value="constrained" selected>Constrained</option>
+                    <option value="unconstrained">Unconstrained</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="smirnoffVersionRow" class="form-group" hidden>
+            <label for="openffVersion" class="control-label col-md-2">SMIRNOFF Version</label>
+            <div class="col-md-10">
+                <select name="openffVersion" id="openffVersion" class="form-control" onchange="optionChanged()"></select>
+            </div>
+        </div>
+        <div class="form-group">
+        <label for="ligandMinimization" class="control-label col-md-2">Ligand Minimization</label>
+        <div class="col-md-10"><select name="ligandMinimization" id="ligandMinimization" class="form-control" title="Minimize ligand with MMFF94 rdkit without protein" onchange="optionChanged()">
+            <option value="False" selected>No</option>
+            <option value="True">Yes</option>
+        </select></div>
+        </div>
+        <div class="form-group">
+        <label for="ligandSanitization" class="control-label col-md-2">
+            <span style=" font-weight: 700" title="Depending on the ligand the Sanitization can be required for OpenMM or may lead to errors in case of specific ligand substructures (example: Thiopene)"">Ligand Sanitization</span>
+        </label>
+        <div class="col-md-10"><select name="ligandSanitization" id="ligandSanitization" class="form-control" title="Sanitize ligand with rdkit" onchange="optionChanged()">
+            <option value="False" selected>No</option>
+            <option value="True">Yes</option>
+        </select></div>
+        </div>
+        <div id="highThroughputHint" class="form-group" hidden>
+        <label class="control-label col-md-2">High Throughput</label>
+        <div class="col-md-10"><p class="form-control-static">One simulation setup will be generated per entry in the ligand SDF.</p></div>
         </div>
     </div>
 
-    <div id="smirnoffConstraintRow" class="form-group" hidden>
-        <label for="openffConstraint" class="control-label col-md-2">SMIRNOFF Mode</label>
-        <div class="col-md-10">
-            <select name="openffConstraint" id="openffConstraint" class="form-control" onchange="optionChanged()">
-                <option value="constrained" selected>Constrained</option>
-                <option value="unconstrained">Unconstrained</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="smirnoffVersionRow" class="form-group" hidden>
-        <label for="openffVersion" class="control-label col-md-2">SMIRNOFF Version</label>
-        <div class="col-md-10">
-            <select name="openffVersion" id="openffVersion" class="form-control" onchange="optionChanged()"></select>
-        </div>
-    </div>
-    <div class="form-group">
-    <label for="ligandMinimization" class="control-label col-md-2">Ligand Minimization</label>
-    <div class="col-md-10"><select name="ligandMinimization" id="ligandMinimization" class="form-control" title="Minimize ligand with MMFF94 rdkit without protein" onchange="optionChanged()">
-        <option value="False" selected>No</option>
-        <option value="True">Yes</option>
-    </select></div>
-    </div>
-    <div class="form-group">
-    <label for="ligandSanitization" class="control-label col-md-2">
-        <span style=" font-weight: 700" title="Depending on the ligand the Sanitization can be required for OpenMM or may lead to errors in case of specific ligand substructures (example: Thiopene)"">Ligand Sanitization</span>
-    </label>
-    <div class="col-md-10"><select name="ligandSanitization" id="ligandSanitization" class="form-control" title="Sanitize ligand with rdkit" onchange="optionChanged()">
-        <option value="False" selected>No</option>
-        <option value="True">Yes</option>
-    </select></div>
-    </div>
-    <div id="highThroughputHint" class="form-group" hidden>
-    <label class="control-label col-md-2">High Throughput</label>
-    <div class="col-md-10"><p class="form-control-static">One simulation setup will be generated per entry in the ligand SDF.</p></div>
-    </div>
     <br/>
     <button type="button" class="btn btn-default btn-back-red"
             onclick="window.location.href='{{ url_for('showSelectFileType') }}'">Back</button>
@@ -259,21 +266,12 @@ var amoebaWaterModels = [
         ["Implicit", "Implicit", false]
 ]
 
-var standardForcefields = [
-        ["AMBER19", "AMBER19", false],
-        ["AMBER14", "AMBER14", true],
-        ["AMBER99SB", "AMBER99SB", false],
-        ["AMBER99SB-ILDN", "AMBER99SB-ILDN", false],
-        ["AMBER03", "AMBER03", false],
-        ["AMBER10", "AMBER10", false],
-        ["CHARMM36", "CHARMM36", false],
-        ["CHARMM2024", "CHARMM36 2024", false],
-]
 
 // PTM-fähige Kraftfelder — hier später weitere ergänzen
 var ptmForcefields = [
         ["OPENFF3", "OpenFF 3.0 (PTM)", true],
 ]
+var ptmForcefieldValues = ptmForcefields.map(f => f[0]);
 
 // Erlaubte Wassermodelle je PTM-Kraftfeld — hier später weitere Einträge ergänzen
 var ptmWaterModels = {
@@ -595,9 +593,11 @@ function optionChanged() {
     // -------------------------
     ptmSection = document.getElementById("ptmSection");
     smallMoleculeModeSelect = document.getElementById("smallMoleculeMode");
+    smallMoleculeSection = document.getElementById("smallMoleculeSection");
 
     if (ptmMode) {
         ptmSection.hidden = false;
+        smallMoleculeSection.hidden = true;
         smallMoleculeModeSelect.value = "none";
         smallMoleculeModeSelect.disabled = true;
         variableLigandSection.hidden = true;
@@ -605,6 +605,7 @@ function optionChanged() {
         highThroughputHint.hidden = true;
     } else {
         ptmSection.hidden = true;
+        smallMoleculeSection.hidden = false;
         smallMoleculeModeSelect.disabled = false;
     }
 
@@ -660,7 +661,7 @@ function optionChanged() {
         duplicateWarning.style.display = duplicateResnames ? "block" : "none";
 
     document.getElementById('continue').disabled = !document.getElementById("file").value || invalidResnames || duplicateResnames;
-        ptmFileInput = document.getElementById("ptmLigandFile");
+    ptmFileInput = document.getElementById("ptmLigandFile");
     ptmFiles = ptmFileInput ? ptmFileInput.files : null;
     document.getElementById("ptmLigandFile_label").textContent = (!ptmFiles || ptmFiles.length == 0 ? "" : ptmFiles[0].name);
 

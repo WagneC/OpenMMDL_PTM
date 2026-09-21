@@ -16,9 +16,8 @@
     <p>
     <label class="control-label"><input type="checkbox" id="addWater" name="addWater" onchange="waterBoxChanged()"> Add water box</label>
     <p>
-    <label class="control-label">
-        <input type="checkbox" id="addMembrane" name="addMembrane" onchange="membraneBoxChanged()" {% if ptm_mode %}disabled{% endif %}> Add membrane and water
-        {% if ptm_mode %}<span class="help-block" style="display:inline; margin-left:8px;">(nicht verfügbar für PTM-Reste — die OpenFF/Interchange-Pipeline unterstützt noch keine Membranen)</span>{% endif %}
+    <label class="control-label" {% if ptm_mode %}hidden{% endif %}>
+        <input type="checkbox" id="addMembrane" name="addMembrane" onchange="membraneBoxChanged()"> Add membrane and water
     </label>
     <div id="waterInputs" class="col-md-offset-1">
         How do you want to select the size of the water box?
