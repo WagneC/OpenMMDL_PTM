@@ -14,8 +14,7 @@
                                                                                                       
 
 from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield
-from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, solvate_absolute_padding_openff
-from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion
+from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, solvate_topol_absolute_openff
 from openmmdl.openmmdl_simulation.scripts.cleaning_procedures import cleanup_post_md, close_reporters, create_directory_if_not_exists, copy_file, organize_files, post_md_file_movement 
 
 import simtk.openmm.app as app
@@ -146,12 +145,6 @@ topology_openff = topology_from_pdb(
 
 topology_openff.box_vectors = None 
 
-topology_openff = solvate_topology(
-    topology_openff,
-    nacl_conc=Quantity(water_ionicstrength, "mol/L"),
-    padding=Quantity(water_padding_distance, "nm"),
-    box_shape=UNIT_CUBE,
-)
 if Water_Box == "Buffer":
     topology_openff = solvate_topol_padding_openff(
         topology_openff,
@@ -162,7 +155,7 @@ if Water_Box == "Buffer":
         water_negative_ion,
     )
 elif Water_Box == "Absolute":
-    topology_openff = solvate_absolute_padding_openff(
+    topology_openff = solvate_topol_absolute_openff(
         topology_openff,
         water_box_x,
         water_box_y,

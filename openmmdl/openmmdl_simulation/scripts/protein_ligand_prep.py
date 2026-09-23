@@ -8,6 +8,7 @@ from openff.toolkit.topology import Molecule
 from simtk.openmm.app import PDBFile
 from simtk.openmm import unit
 from simtk.openmm import Vec3
+from openff.interchange.components._packmol import (RHOMBIC_DODECAHEDRON, UNIT_CUBE,solvate_topology) 
 
 
 def prepare_ligand(ligand_file, sanitization=False, minimize_molecule=True):
@@ -453,3 +454,24 @@ def water_conversion(model_water, modeller_pre_conversion, protein_name):
 
     return modeller
 
+def solvate_topol_padding_openff(topology, water_padding_distance, water_boxShape, water_ionicstrength, water_positive_ion, water_negative_ion):
+    topology = None
+    
+    BOX_SHAPES = {
+    "cube": UNIT_CUBE,
+    "dodecahedron": RHOMBIC_DODECAHEDRON
+    }
+    topology_openff.box_vectors = None
+
+    return topology
+
+def solvate_topol_absolute_openff(topology, water_box_x, water_box_y, water_box_z, water_ionicstrength, water_positive_ion, water_negative_ion):
+    topology = None
+
+    BOX_SHAPES = {
+    "cube": UNIT_CUBE,
+    "dodecahedron": RHOMBIC_DODECAHEDRON
+    }
+    topology_openff.box_vectors = None
+
+    return topology

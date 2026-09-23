@@ -59,7 +59,9 @@
             <div class="col-md-9">
             <select id="geometryDropdown" name="geometryDropdown" class="form-control">
                 <option value="cube" selected="selected">Cube</option>
+                {% if not ptm_mode %}
                 <option value="octahedron">Truncated octahedron</option>
+                {% endif %}
                 <option value="dodecahedron">Rhombic dodecahedron</option>
             </select>
             </div>

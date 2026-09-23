@@ -1890,12 +1890,25 @@ print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
 
 topology_openff.box_vectors = None
 
-topology_openff = solvate_topology(
-    topology_openff,
-    nacl_conc=Quantity(water_ionicstrength, "mol/L"),
-    padding=Quantity(water_padding_distance, "nm"),
-    box_shape=UNIT_CUBE,
-)
+if Water_Box == "Buffer":
+    topology_openff = solvate_topol_padding_openff(
+        topology_openff,
+        water_padding_distance,
+        water_boxShape,
+        water_ionicstrength,
+        water_positive_ion,
+        water_negative_ion,
+    )
+elif Water_Box == "Absolute":
+    topology_openff = solvate_topol_absolute_openff(
+        topology_openff,
+        water_box_x,
+        water_box_y,
+        water_box_z,
+        water_ionicstrength,
+        water_positive_ion,
+        water_negative_ion,
+    )
 
 forcefield_selected = ff_selection(ff)
 water_selected = water_forcefield_selection(water=water, forcefield_selection=ff_selection(ff))
