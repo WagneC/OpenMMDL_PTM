@@ -1,0 +1,32 @@
+Warning: importing 'simtk.openmm' is deprecated.  Import 'openmm' instead.
+Warning on use of the timeseries module: If the inherent timescales of the system are long compared to those being analyzed, this statistical inefficiency may be an underestimate.  The estimate presumes the use of many statistically independent samples.  Tests should be performed to assess whether this condition is satisfied.   Be cautious in the interpretation of the data.
+
+****** PyMBAR will use 64-bit JAX! *******
+* JAX is currently set to 32-bit bitsize *
+* which is its default.                  *
+*                                        *
+* PyMBAR requires 64-bit mode and WILL   *
+* enable JAX's 64-bit mode when called.  *
+*                                        *
+* This MAY cause problems with other     *
+* Uses of JAX in the same code.          *
+******************************************
+
+Preparing PTM residue topology...
+Traceback (most recent call last):
+  File "/home/cwagner/.conda/envs/openmmdl_ptm1/lib/python3.13/site-packages/openff/toolkit/topology/topology.py", line 2550, in __getattr__
+    for element in molecule.hierarchy_schemes[name].hierarchy_elements
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+KeyError: 'getNumAtoms'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/cwagner/openmmdl_ptm/OpenMMDL/openmmdl_ptm/tests/openmmdl_padding_test/1/Padding_script.py", line 126, in <module>
+    print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/cwagner/.conda/envs/openmmdl_ptm1/lib/python3.13/site-packages/openff/toolkit/topology/topology.py", line 2553, in __getattr__
+    raise AttributeError(
+    ...<3 lines>...
+    ) from error
+AttributeError: 'Topology' object has no attribute 'getNumAtoms'. If looking for a `HierarchyScheme` iterator, not all molecules in this topology have an interator name getNumAtoms defined.

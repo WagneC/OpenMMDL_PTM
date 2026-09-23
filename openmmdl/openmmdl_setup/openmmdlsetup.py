@@ -1531,7 +1531,7 @@ os.chdir(outputDir)""")
         "from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield"
     )
     script.append(
-        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges"
+        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, solvate_topol_absolute_openff"
     )
     script.append(
         "from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion"
@@ -1552,9 +1552,7 @@ os.chdir(outputDir)""")
             "from openff.pablo import ResidueDefinition, STD_CCD_CACHE, topology_from_pdb"
         )
         script.append("from openff.toolkit import ForceField")
-        script.append(
-            "from openff.interchange.components._packmol import UNIT_CUBE, solvate_topology"
-        )
+        script.append("from openff.interchange.components._packmol import (RHOMBIC_DODECAHEDRON, UNIT_CUBE, solvate_topology)")
         script.append("from openff.units import Quantity")
     script.append("from openmm.openmm import XmlSerializer")
     script.append("from simtk.openmm import Vec3")
@@ -1896,8 +1894,6 @@ if Water_Box == "Buffer":
         water_padding_distance,
         water_boxShape,
         water_ionicstrength,
-        water_positive_ion,
-        water_negative_ion,
     )
 elif Water_Box == "Absolute":
     topology_openff = solvate_topol_absolute_openff(
@@ -1906,8 +1902,6 @@ elif Water_Box == "Absolute":
         water_box_y,
         water_box_z,
         water_ionicstrength,
-        water_positive_ion,
-        water_negative_ion,
     )
 
 forcefield_selected = ff_selection(ff)

@@ -97,10 +97,27 @@
         <label class="control-label col-md-3" for="ionicstrengthfield">Ionic strength (molar)</label><div class="col-md-9"><input type="text" id="ionicstrengthfield" name="ionicstrength" value="0.15" class="form-control"></div>
     </div>
     <div class="form-group">
-        <label class="control-label col-md-3" for="positiveion">Positive ion</label><div class="col-md-9"><select name="positiveion" id="positiveion" class="form-control"><option value="Cs">Cs+</option><option value="K">K+</option><option value="Li">Li+</option><option value="Na" selected>Na+</option><option value="Rb">Rb+</option></select></div>
+        <label class="control-label col-md-3" for="positiveion">Positive ion</label>
+        <div class="col-md-9">
+            <select name="positiveion" id="positiveion" class="form-control">
+                {% if not ptm_mode %}<option value="Cs">Cs+</option>
+                <option value="K">K+</option>
+                <option value="Li">Li+</option>{% endif %}
+                <option value="Na" selected>Na+</option>
+                {% if not ptm_mode %}<option value="Rb">Rb+</option>{% endif %}
+            </select>
+        </div>
     </div>
     <div class="form-group">
-        <label class="control-label col-md-3" for="negativeion">Negative ion</label><div class="col-md-9"><select name="negativeion" id="negativeion" class="form-control"><option value="Cl" selected>Cl-</option><option value="Br">Br-</option><option value="F">F-</option><option value="I">I-</option></select></div>
+        <label class="control-label col-md-3" for="negativeion">Negative ion</label>
+        <div class="col-md-9">
+            <select name="negativeion" id="negativeion" class="form-control">
+                <option value="Cl" selected>Cl-</option>
+                {% if not ptm_mode %}<option value="Br">Br-</option>
+                <option value="F">F-</option>
+                <option value="I">I-</option>{% endif %}
+            </select>
+        </div>
     </div>
     </div>
     <p>
