@@ -303,8 +303,33 @@ def configureFiles():
         ]
         if not _resnames_are_unique(all_resnames):
             raise ValueError("Ligand topology codes must be unique.")
+
+        # --- PTM Residue fields ---
+        # In lokale Variablen lesen, NICHT direkt in session schreiben — configureDefaultOptions()
+        # weiter unten setzt session["ptmMode"] etc. unconditional auf die Defaults zurück.
+        ptm_mode = "ptmMode" in request.form
+        ptm_res_name = _normalize_resname(request.form.get("ptmResName", ""), "CYS")
+        ptm_res_smiles = request.form.get("ptmResSmiles", "").strip()
+        ptm_lig_smiles = request.form.get("ptmLigSmiles", "").strip()
+        ptm_product_smiles = request.form.get("ptmProductSmiles", "").strip()
+        ptm_ligand_file = (
+            uploadedFiles["ptmLigandFile"][0][1] if "ptmLigandFile" in uploadedFiles else ""
+        )
+        if ptm_mode and not (ptm_ligand_file and ptm_res_smiles and ptm_lig_smiles and ptm_product_smiles):
+            raise ValueError(
+                "PTM residue mode requires a ligand file and all three SMARTS fields."
+            )
+        
+    
         configureDefaultOptions()
-        session["ptmMode"] = "ptmMode" in request.form
+        session["ptmMode"] = ptm_mode
+        session["ptmResName"] = ptm_res_name
+        session["ptmResSmiles"] = ptm_res_smiles
+        session["ptmLigSmiles"] = ptm_lig_smiles
+        session["ptmProductSmiles"] = ptm_product_smiles
+        session["ptmLigandFile"] = ptm_ligand_file
+
+        
         file, name = uploadedFiles["file"][0]
         file.seek(0, 0)
         session["pdbType"] = _guessFileFormat(file, name)
@@ -1522,6 +1547,15 @@ os.chdir(outputDir)""")
     script.append(
         "from simtk.openmm import unit, Platform, MonteCarloBarostat, LangevinMiddleIntegrator"
     )
+    if session.get("ptmMode"):
+        script.append(
+            "from openff.pablo import ResidueDefinition, STD_CCD_CACHE, topology_from_pdb"
+        )
+        script.append("from openff.toolkit import ForceField")
+        script.append(
+            "from openff.interchange.components._packmol import UNIT_CUBE, solvate_topology"
+        )
+        script.append("from openff.units import Quantity")
     script.append("from openmm.openmm import XmlSerializer")
     script.append("from simtk.openmm import Vec3")
     script.append("import simtk.openmm as mm")
@@ -1550,7 +1584,36 @@ os.chdir(outputDir)""")
                 protein_path_override if protein_path_override else uploadedFiles["file"][0][1]
             )
             script.append('protein = "%s"' % pdb_path)
-            if has_pdb_ligands:
+
+            if session.get("ptmMode"):
+                script.append("ligand = %r" % session["ptmLigandFile"])
+                script.append("smallMoleculeForceField = None")
+                script.append("smallMoleculeForceFieldVersion = None")
+                script.append(
+                    "RESname = %r\nRESsmiles = %r\nLIGsmiles = %r\nPTMsmiles = %r"
+                    % (
+                        session["ptmResName"],
+                        session["ptmResSmiles"],
+                        session["ptmLigSmiles"],
+                        session["ptmProductSmiles"],
+                    )
+                )
+                script.append("""
+############# PTM Residue Definition ####################################
+
+LIGresdef = ResidueDefinition.anon_from_sdf(ligand)
+RESresdef = STD_CCD_CACHE[RESname][0]
+PTMresdef = ResidueDefinition.react(
+    reactants=[RESresdef, LIGresdef],
+    reactant_smarts=[
+        RESsmiles,
+        LIGsmiles,
+    ],
+    product_smarts=[
+        PTMsmiles,
+    ],
+)[0][0]""")
+            elif has_pdb_ligands:
                 ligand_paths = []
                 if session["sdfFile"] != "":
                     ligand_paths.append(
@@ -1810,7 +1873,37 @@ os.chdir(outputDir)""")
     # Prepare the simulation
 
     if fileType == "pdb":
-        if has_pdb_ligands:
+        if session.get("ptmMode"):
+            if not session.get("solvent"):
+                raise ValueError(
+                    "PTM residue mode requires a water box (the OpenFF/Interchange "
+                    "pipeline always solvates the system)."
+                )
+            script.append("""
+print("Preparing PTM residue topology...")
+
+topology_openff = topology_from_pdb(
+    protein,
+    additional_definitions=[PTMresdef],
+)
+print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
+
+topology_openff.box_vectors = None
+
+topology_openff = solvate_topology(
+    topology_openff,
+    nacl_conc=Quantity(water_ionicstrength, "mol/L"),
+    padding=Quantity(water_padding_distance, "nm"),
+    box_shape=UNIT_CUBE,
+)
+
+forcefield_selected = ff_selection(ff)
+water_selected = water_forcefield_selection(water=water, forcefield_selection=ff_selection(ff))
+
+sage_ff14sb = ForceField(forcefield_selected, water_selected)
+interchange = sage_ff14sb.create_interchange(topology_openff)""")
+            
+        elif has_pdb_ligands:
             script.append("""
 print("Preparing MD Simulation with ligand(s)")
 protein_pdb = pdbfixer.PDBFixer(str(protein))
@@ -1847,7 +1940,7 @@ else:
 if add_membrane:
         transitional_forcefield = generate_transitional_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)     """
             )
-        if not has_pdb_ligands:
+        if not has_pdb_ligands and not session.get("ptmMode"):
             script.append("""
 forcefield = generate_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)        
 modeller = app.Modeller(protein_pdb.topology, protein_pdb.positions)
@@ -1861,7 +1954,7 @@ elif not add_membrane:
 topology = modeller.topology
 positions = modeller.positions
 positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.nanometers """)
-        elif has_pdb_ligands:
+        elif has_pdb_ligands and not session.get("ptmMode"):
             script.append("""
 modeller = app.Modeller(complex_topology, complex_positions)
 if add_membrane:
@@ -1881,7 +1974,21 @@ positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.
     script.append("\n# Prepare the Simulation\n")
     script.append("print('Building system...')")
     hmrOptions = ", hydrogenMass=hydrogenMass" if session["hmr"] else ""
-    if fileType == "pdb":
+    if fileType == "pdb" and session.get("ptmMode"):
+        interchange_system_args = []
+        if session["hmr"]:
+            interchange_system_args.append("hydrogen_mass=hydrogenMass")
+        if nonbondedMethod == "PME":
+            interchange_system_args.append("ewald_tolerance=ewaldErrorTolerance")
+        script.append(
+            "system = interchange.to_openmm_system(%s)" % ", ".join(interchange_system_args)
+        )
+        script.append("topology = interchange.to_openmm_topology()")
+        script.append("positions = interchange.positions.to_openmm()")
+        script.append(
+            "positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.nanometers"
+        )
+    elif fileType == "pdb":
         script.append(
             "system = forcefield.createSystem(topology, nonbondedMethod=nonbondedMethod,%s"
             % (" nonbondedCutoff=nonbondedCutoff," if nonbondedMethod != "NoCutoff" else "")

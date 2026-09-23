@@ -14,7 +14,7 @@
                                                                                                       
 
 from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield
-from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges
+from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, solvate_absolute_padding_openff
 from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion
 from openmmdl.openmmdl_simulation.scripts.cleaning_procedures import cleanup_post_md, close_reporters, create_directory_if_not_exists, copy_file, organize_files, post_md_file_movement 
 
@@ -144,7 +144,7 @@ topology_openff = topology_from_pdb(
 # Padding, Cubic box, feste size Cubic box etc einfügen 
 # Membran einfügen
 
-topology_openff.box_vectors = None # Setzt vordefinierte Boxvektoren auf None, damit Padding korrekt angewendet wird
+topology_openff.box_vectors = None 
 
 topology_openff = solvate_topology(
     topology_openff,
@@ -152,14 +152,33 @@ topology_openff = solvate_topology(
     padding=Quantity(water_padding_distance, "nm"),
     box_shape=UNIT_CUBE,
 )
+if Water_Box == "Buffer":
+    topology_openff = solvate_topol_padding_openff(
+        topology_openff,
+        water_padding_distance,
+        water_boxShape,
+        water_ionicstrength,
+        water_positive_ion,
+        water_negative_ion,
+    )
+elif Water_Box == "Absolute":
+    topology_openff = solvate_absolute_padding_openff(
+        topology_openff,
+        water_box_x,
+        water_box_y,
+        water_box_z,
+        water_ionicstrength,
+        water_positive_ion,
+        water_negative_ion,
+    )
+
+
 
 # Prepare the FF
 
 protein_pdb = PDBFile(protein) 
 forcefield_selected = ff_selection(ff) # Protein
 water_selected = water_forcefield_selection(water_ff, forcefield_selected)
-forcefield = generate_forcefield(protein_ff=forcefield_selected, solvent_ff=water_selected, add_membrane=add_membrane, smallMoleculeForceField=smallMoleculeForceField, smallMoleculeForceFieldVersion=smallMoleculeForceFieldVersion, rdkit_mol=None)        
-
 
 ############# Parameterize PTM #####################
 
