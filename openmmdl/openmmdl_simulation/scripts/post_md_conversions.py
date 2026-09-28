@@ -238,11 +238,11 @@ def MDanalysis_conversion(
         # Anchor for centering: protein + ligand + lipids + glycans (if present)
         anchor = prot if prot.n_atoms else u.atoms
         if lig.n_atoms:
-            anchor = anchor + lig
+            anchor = anchor | lig
         if lip.n_atoms:
-            anchor = anchor + lip
+            anchor = anchor | lip
         if glycan.n_atoms:
-            anchor = anchor + glycan
+            anchor = anchor | glycan
 
         protein = prot
         non_protein = _safe_select(u, "not protein")

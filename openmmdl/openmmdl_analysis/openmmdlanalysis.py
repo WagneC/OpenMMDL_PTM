@@ -804,7 +804,7 @@ def run_analysis(args) -> int:
     logger.info("\033[1mAnalysis is Finished.\033[0m")
 
     if stable_water_analysis:
-        stable_water_analyser.stable_waters_pipeline(topology, trajectory, water_eps)
+        stable_water_analyser.stable_waters_pipeline()
         stable_water_analyser.analyze_protein_and_water_interaction(topology, "representative_waters.pdb", water_eps)
 
     return 0

@@ -509,8 +509,10 @@ def _cis_trans_to_e_z(rdmol):
 @contextmanager
 def _openff_accepts_cis_trans():
     """Temporarily patches Molecule.from_rdkit to accept cis/trans bond stereo."""
-    original = Molecule.__dict__["from_rdkit"]
-    orig_func = original.__func__
+    # from_rdkit is usually inherited from FrozenMolecule, not defined on Molecule itself
+    had_own = "from_rdkit" in Molecule.__dict__
+    saved = Molecule.__dict__.get("from_rdkit")
+    orig_func = Molecule.from_rdkit.__func__
 
     def _patched(cls, rdmol, *args, **kwargs):
         return orig_func(cls, _cis_trans_to_e_z(rdmol), *args, **kwargs)
@@ -519,7 +521,10 @@ def _openff_accepts_cis_trans():
     try:
         yield
     finally:
-        Molecule.from_rdkit = original
+        if had_own:
+            Molecule.from_rdkit = saved
+        else:
+            del Molecule.from_rdkit
 
 
 def ptm_topology_from_pdb(protein, ptm_resdef):
@@ -530,3 +535,91 @@ def ptm_topology_from_pdb(protein, ptm_resdef):
         topology = topology_from_pdb(protein, additional_definitions=[ptm_resdef])
     topology.box_vectors = None
     return topology
+
+
+REFERENCE_OPENMM_FF = ("amber14-all.xml", "amber14/tip3p.xml")
+
+
+def load_reference_forcefield(forcefield_selected, water_selected=None):
+    """Load an OpenMM force field whose residue templates serve as a reference.
+
+    OpenFF force fields (.offxml) do not contain residue templates, so in that case
+    an OpenMM reference force field is used (for recognition only, not for parametrization).
+    """
+    files = [f for f in (forcefield_selected, water_selected) if f]
+    if not files or any(f.endswith(".offxml") for f in files):
+        print(f"OpenFF force field has no residue templates; using {REFERENCE_OPENMM_FF} as reference.")
+        files = list(REFERENCE_OPENMM_FF)
+    return app.ForceField(*files)
+
+
+def _solvent_templates(reference_ff):
+    """Read water and ion names from the templates of the force field."""
+    water = None
+    ions = {}
+    for template in reference_ff._templates.values():
+        atoms = [a for a in template.atoms if a.element is not None]  # ohne Virtual Sites
+        symbols = sorted(a.element.symbol for a in atoms)
+        if water is None and symbols == ["H", "H", "O"]:
+            water = (template.name, [a.name for a in atoms])
+        elif len(template.atoms) == 1 and atoms:
+            ions.setdefault(atoms[0].element.symbol, (template.name, atoms[0].name))
+    return water, ions
+
+
+def rename_openff_solvent(topology, reference_ff):
+    """Change names of water and ions to match the reference force field.
+    """
+    water, ions = _solvent_templates(reference_ff)
+    if water is None:
+        raise ValueError("No water template found in the reference force field (water XML missing?).")
+    water_resname, water_atom_names = water
+    water_o = [n for n in water_atom_names if n.upper().startswith("O")][0]
+    water_h = [n for n in water_atom_names if n.upper().startswith("H")]
+
+    for residue in topology.residues():
+        atoms = list(residue.atoms())
+        symbols = [a.element.symbol if a.element is not None else "" for a in atoms]
+        if sorted(symbols) == ["H", "H", "O"]:
+            residue.name = water_resname
+            h_names = iter(water_h)
+            for atom in atoms:
+                atom.name = water_o if atom.element.symbol == "O" else next(h_names)
+        elif len(atoms) == 1 and symbols[0] in ions:
+            residue.name, atoms[0].name = ions[symbols[0]]
+        else:
+            counts = {}
+            for atom, sym in zip(atoms, symbols):
+                if not atom.name or not atom.name.strip():
+                    counts[sym] = counts.get(sym, 0) + 1
+                    atom.name = f"{sym or 'X'}{counts[sym]}"
+    return topology
+
+
+def get_ptm_residue_name(topology, ptm_name, reference_ff=None):
+    """Check that the user-defined PTM residue is present in the topology.
+
+    Returns:
+        str: The PTM residue name, used as ligand name in post-processing/analysis.
+    """
+    ptm_name = ptm_name.strip().upper()
+    ptm_residues = [res for res in topology.residues() if res.name == ptm_name]
+    if not ptm_residues:
+        found = sorted({res.name for res in topology.residues()})
+        raise ValueError(
+            f"PTM residue '{ptm_name}' not found in the topology. "
+            f"Residue names present: {found}. Check the residue name in the input PDB."
+        )
+    print(
+        f"Found {len(ptm_residues)} PTM residue(s) named '{ptm_name}' "
+        f"(chain index, residue index: {[(r.chain.index, r.index) for r in ptm_residues]})."
+    )
+
+    if reference_ff is not None:
+        others = sorted({r.name for r in reference_ff.getUnmatchedResidues(topology)} - {ptm_name})
+        if others:
+            print(
+                "Warning: these residues also have no force field template and are NOT "
+                f"treated as PTM/ligand in the analysis: {others}"
+            )
+    return ptm_name

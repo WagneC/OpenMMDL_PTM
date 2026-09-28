@@ -305,25 +305,29 @@ def configureFiles():
             raise ValueError("Ligand topology codes must be unique.")
 
         # --- PTM Residue fields ---
-        # In lokale Variablen lesen, NICHT direkt in session schreiben — configureDefaultOptions()
-        # weiter unten setzt session["ptmMode"] etc. unconditional auf die Defaults zurück.
         ptm_mode = "ptmMode" in request.form
         ptm_res_name = _normalize_resname(request.form.get("ptmResName", ""), "CYS")
+        ptm_product_name = _normalize_resname(request.form.get("ptmProductName", ""), "")
         ptm_res_smiles = request.form.get("ptmResSmiles", "").strip()
         ptm_lig_smiles = request.form.get("ptmLigSmiles", "").strip()
         ptm_product_smiles = request.form.get("ptmProductSmiles", "").strip()
         ptm_ligand_file = (
             uploadedFiles["ptmLigandFile"][0][1] if "ptmLigandFile" in uploadedFiles else ""
         )
-        if ptm_mode and not (ptm_ligand_file and ptm_res_smiles and ptm_lig_smiles and ptm_product_smiles):
+        if ptm_mode and not (ptm_ligand_file and ptm_res_smiles and ptm_lig_smiles and ptm_product_smiles and ptm_product_name):
             raise ValueError(
-                "PTM residue mode requires a ligand file and all three SMARTS fields."
+                "PTM residue mode requires a ligand file, all three SMARTS fields and a 3-letter PTM residue name."
+            )
+        if ptm_mode and ptm_product_name == ptm_res_name:
+            raise ValueError(
+                "The PTM residue name must differ from the residue that is modified (e.g. not 'CYS')."
             )
         
     
         configureDefaultOptions()
         session["ptmMode"] = ptm_mode
         session["ptmResName"] = ptm_res_name
+        session["ptmProductName"] = ptm_product_name
         session["ptmResSmiles"] = ptm_res_smiles
         session["ptmLigSmiles"] = ptm_lig_smiles
         session["ptmProductSmiles"] = ptm_product_smiles
@@ -1433,6 +1437,7 @@ def configureDefaultOptions():
     session["ptmMode"] = False 
     session["ptmLigandFile"] = ""
     session["ptmResName"] = ""
+    session["ptmProductName"] = ""
     session["ptmResSmiles"] = ""
     session["ptmLigSmiles"] = "" 
     session["ptmProductSmiles"] = ""
@@ -1531,7 +1536,7 @@ os.chdir(outputDir)""")
         "from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield"
     )
     script.append(
-        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, ptm_topology_from_pdb, solvate_topol_absolute_openff"
+        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, ptm_topology_from_pdb, solvate_topol_absolute_openff, rename_openff_solvent, get_ptm_residue_name, load_reference_forcefield"
     )
     script.append(
         "from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion"
@@ -1574,6 +1579,7 @@ os.chdir(outputDir)""")
     script.append("\n# Input Files")
     fileType = session["fileType"]
     has_pdb_ligands = bool(session.get("sdfFile") or session.get("companionFiles"))
+    has_ligand_output = has_pdb_ligands or bool(session.get("ptmMode"))
     if fileType == "pdb":
         script.append("""############# Ligand and Protein Data ###################""")
         script.append(
@@ -1588,12 +1594,14 @@ os.chdir(outputDir)""")
 
             if session.get("ptmMode"):
                 script.append("ligand = %r" % session["ptmLigandFile"])
+                script.append("ligands = [ligand]")
                 script.append("smallMoleculeForceField = None")
                 script.append("smallMoleculeForceFieldVersion = None")
                 script.append(
-                    "RESname = %r\nRESsmiles = %r\nLIGsmiles = %r\nPTMsmiles = %r"
+                    "RESname = %r\nPTMname = %r\nRESsmiles = %r\nLIGsmiles = %r\nPTMsmiles = %r"
                     % (
                         session["ptmResName"],
+                        session["ptmProductName"],
                         session["ptmResSmiles"],
                         session["ptmLigSmiles"],
                         session["ptmProductSmiles"],
@@ -1907,7 +1915,11 @@ forcefield_selected = ff_selection(ff)
 water_selected = water_forcefield_selection(water=water, forcefield_selection=ff_selection(ff))
 
 sage_ff14sb = ForceField(forcefield_selected, water_selected)
-interchange = sage_ff14sb.create_interchange(topology_openff)""")
+interchange = sage_ff14sb.create_interchange(topology_openff)
+
+
+
+""")
             
         elif has_pdb_ligands:
             script.append("""
@@ -1990,6 +2002,10 @@ positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.
             "system = interchange.to_openmm_system(%s)" % ", ".join(interchange_system_args)
         )
         script.append("topology = interchange.to_openmm_topology()")
+        script.append("reference_ff = load_reference_forcefield(forcefield_selected, water_selected)")
+        script.append("topology = rename_openff_solvent(topology, reference_ff)")
+        script.append("ligand_name = get_ptm_residue_name(topology, PTMname, reference_ff)")
+        script.append("ligand_names = [ligand_name]")
         script.append(
             "for residue in topology.residues():\n"
             "    residue.id = str(residue.id)"
@@ -2237,7 +2253,7 @@ stages = [
             script.append(
                 "mdtraj_conversion(f'Equilibration_{protein}', '%s')" % session["mdtraj_output"]
             )
-            if has_pdb_ligands:
+            if has_ligand_output:
                 if session["mdtraj_output"] != "mdtraj_gro_xtc":
                     script.append(
                         "MDanalysis_conversion('centered_old_coordinates_top.pdb', 'centered_old_coordinates.dcd', mda_output='%s', output_selection='%s', ligand_names=globals().get('ligand_names'))"
@@ -2248,7 +2264,7 @@ stages = [
                         "MDanalysis_conversion('centered_old_coordinates_top.gro', 'centered_old_coordinates.xtc', mda_output='%s', output_selection='%s', ligand_names=globals().get('ligand_names'))"
                         % (session["mda_output"], session["mda_selection"])
                     )
-            elif not has_pdb_ligands:
+            elif not has_ligand_output:
                 if session["mdtraj_output"] != "mdtraj_gro_xtc":
                     script.append(
                         "MDanalysis_conversion('centered_old_coordinates_top.pdb', 'centered_old_coordinates.dcd', mda_output='%s', output_selection='%s')"
@@ -2315,12 +2331,12 @@ stages = [
 
     # post_md_file_movement()
     if fileType == "pdb":
-        if has_pdb_ligands:
+        if has_ligand_output:
             script.append(
                 "post_md_file_movement(protein, ligands=globals().get('ligands'), mda_selection='%s')"
                 % session["mda_selection"]
             )
-        elif not has_pdb_ligands:
+        elif not has_ligand_output:
             script.append(
                 "post_md_file_movement(protein, mda_selection='%s')" % session["mda_selection"]
             )
@@ -2361,18 +2377,18 @@ stages = [
         elif session["mdtraj_output"] == "mdtraj_gro_xtc":
             top_ext = ".gro"
             traj_ext = ".xtc"
-        if fileType == "pdb" and has_pdb_ligands:
+        if fileType == "pdb" and has_ligand_output:
             script.append(
                 "analysis_special_flags = ''.join(f\" -s {name}\" for name in ligand_names[1:])"
             )
         # session[analysis_selection] == 'analysis_all'
         if session["analysis_selection"] == "analysis_all":
             if fileType == "pdb":
-                if has_pdb_ligands:
+                if has_ligand_output:
                     script.append(
                         f"analysis_jobs.append(('Final_Output/All_Atoms', f'openmmdl analysis -t centered_top{top_ext} -d centered_traj{traj_ext} -l {{ligands[0]}} -n {{ligand_names[0]}}{{analysis_special_flags}} -b {session['binding_mode']} -m {session['min_transition']} -r {session['rmsd_diff']} -p {session['pml_generation']} -w {session['stable_water']} --watereps {session['wc_distance']}'))"
                     )
-                elif not has_pdb_ligands:
+                elif not has_ligand_output:
                     script.append(
                         "analysis_jobs.append(('Final_Output/All_Atoms', 'openmmdl analysis -t centered_top%s -d centered_traj%s -b %s -m %s -r %s -p %s -w %s --watereps %s'))"
                         % (
@@ -2435,11 +2451,11 @@ stages = [
         # session[analysis_selection] == 'analysis_prot'
         elif session["analysis_selection"] == "analysis_prot_lig":
             if fileType == "pdb":
-                if has_pdb_ligands:
+                if has_ligand_output:
                     script.append(
                         f"analysis_jobs.append(('Final_Output/Prot_Lig', f'openmmdl analysis -t prot_lig_top{top_ext} -d prot_lig_traj{traj_ext} -l {{ligands[0]}} -n {{ligand_names[0]}}{{analysis_special_flags}} -b {session['binding_mode']} -m {session['min_transition']} -r {session['rmsd_diff']} -p {session['pml_generation']} -w {session['stable_water']} --watereps {session['wc_distance']}'))"
                     )
-                elif not has_pdb_ligands:
+                elif not has_ligand_output:
                     script.append(
                         "analysis_jobs.append(('Final_Output/Prot_Lig', 'openmmdl analysis -t prot_lig_top%s -d prot_lig_traj%s -b %s -m %s -r %s -p %s -w %s --watereps %s'))"
                         % (
@@ -2502,14 +2518,14 @@ stages = [
         # session[analysis_selection] == 'analysis_all_prot'
         elif session["analysis_selection"] == "analysis_all_prot_lig":
             if fileType == "pdb":
-                if has_pdb_ligands:
+                if has_ligand_output:
                     script.append(
                         f"analysis_jobs.append(('Final_Output/All_Atoms', f'openmmdl analysis -t centered_top{top_ext} -d centered_traj{traj_ext} -l {{ligands[0]}} -n {{ligand_names[0]}}{{analysis_special_flags}} -b {session['binding_mode']} -m {session['min_transition']} -r {session['rmsd_diff']} -p {session['pml_generation']} -w {session['stable_water']} --watereps {session['wc_distance']}'))"
                     )
                     script.append(
                         f"analysis_jobs.append(('Final_Output/Prot_Lig', f'openmmdl analysis -t prot_lig_top{top_ext} -d prot_lig_traj{traj_ext} -l {{ligands[0]}} -n {{ligand_names[0]}}{{analysis_special_flags}} -b {session['binding_mode']} -m {session['min_transition']} -r {session['rmsd_diff']} -p {session['pml_generation']} -w {session['stable_water']} --watereps {session['wc_distance']}'))"
                     )
-                elif not has_pdb_ligands:
+                elif not has_ligand_output:
                     script.append(
                         "analysis_jobs.append(('Final_Output/All_Atoms', 'openmmdl analysis -t centered_top%s -d centered_traj%s -b %s -m %s -r %s -p %s -w %s --watereps %s'))"
                         % (
