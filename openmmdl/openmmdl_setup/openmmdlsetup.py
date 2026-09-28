@@ -1531,7 +1531,7 @@ os.chdir(outputDir)""")
         "from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield"
     )
     script.append(
-        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, solvate_topol_absolute_openff"
+        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, ptm_topology_from_pdb, solvate_topol_absolute_openff"
     )
     script.append(
         "from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion"
@@ -1554,6 +1554,9 @@ os.chdir(outputDir)""")
         script.append("from openff.toolkit import ForceField")
         script.append("from openff.interchange.components._packmol import (RHOMBIC_DODECAHEDRON, UNIT_CUBE, solvate_topology)")
         script.append("from openff.units import Quantity")
+        script.append("from rdkit import Chem")
+        script.append("from rdkit.Chem import rdCIPLabeler")
+        script.append("from openff.toolkit import Molecule")
     script.append("from openmm.openmm import XmlSerializer")
     script.append("from simtk.openmm import Vec3")
     script.append("import simtk.openmm as mm")
@@ -1880,11 +1883,7 @@ PTMresdef = ResidueDefinition.react(
             script.append("""
 print("Preparing PTM residue topology...")
 
-topology_openff = topology_from_pdb(
-    protein,
-    additional_definitions=[PTMresdef],
-)
-print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
+topology_openff = ptm_topology_from_pdb(protein, PTMresdef)
 
 topology_openff.box_vectors = None
 
@@ -1984,13 +1983,17 @@ positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.
     if fileType == "pdb" and session.get("ptmMode"):
         interchange_system_args = []
         if session["hmr"]:
-            interchange_system_args.append("hydrogen_mass=hydrogenMass")
+            interchange_system_args.append("hydrogen_mass=hydrogenMass.value_in_unit(unit.amu)")
         if nonbondedMethod == "PME":
             interchange_system_args.append("ewald_tolerance=ewaldErrorTolerance")
         script.append(
             "system = interchange.to_openmm_system(%s)" % ", ".join(interchange_system_args)
         )
         script.append("topology = interchange.to_openmm_topology()")
+        script.append(
+            "for residue in topology.residues():\n"
+            "    residue.id = str(residue.id)"
+        )
         script.append("positions = interchange.positions.to_openmm()")
         script.append(
             "positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.nanometers"

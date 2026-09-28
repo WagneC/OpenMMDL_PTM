@@ -5,6 +5,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --partition=gpu-ultrashort 
 #SBATCH --gres=gpu:1
+#SBATCH --nodelist=n0
 #SBATCH --array=1		# adjust acording to the amount of repilicas needed 1-5
 
 
@@ -16,7 +17,7 @@ script=Box_script.py
 
 # environment variables
 module load conda
-conda activate openmmdl_ptm1   					
+conda activate openmmdl_ptmv1   					
 
 # execute simulation
 cd ${workdir}

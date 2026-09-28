@@ -105,7 +105,7 @@ def water_forcefield_selection(water, forcefield_selection):
                 "TIP5P-Ew": "charmm36_2024/tip5pew.xml",
             },
             "openff_no_water-3.0.0-alpha0.offxml": {
-                "OPC3": "openff_no_water-3.0.0-alpha0/opc3.offxml",
+                "OPC3": "opc3.offxml",
             }
         }
         water_model = water_forcefields.get(forcefield_selection, {}).get(water, None)

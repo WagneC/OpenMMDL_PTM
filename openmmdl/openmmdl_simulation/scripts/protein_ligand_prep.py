@@ -10,6 +10,13 @@ from simtk.openmm import unit
 from simtk.openmm import Vec3
 from openff.interchange.components._packmol import (RHOMBIC_DODECAHEDRON, UNIT_CUBE,solvate_topology)
 from openff.units import Quantity 
+from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
+from openff.toolkit import Molecule
+from contextlib import contextmanager
+from rdkit.Chem import rdCIPLabeler
+
+
 
 
 def prepare_ligand(ligand_file, sanitization=False, minimize_molecule=True):
@@ -477,3 +484,49 @@ def solvate_topol_absolute_openff(topology, water_box_x, water_box_y, water_box_
     nacl_conc=Quantity(water_ionicstrength, "mol/L"),
     padding=None,
     )
+
+_CIS_TRANS = (Chem.BondStereo.STEREOCIS, Chem.BondStereo.STEREOTRANS)
+
+
+def _cis_trans_to_e_z(rdmol):
+    """Converts RDKit STEREOCIS/STEREOTRANS bond stereo to STEREOE/STEREOZ via CIP labels,
+    since the OpenFF toolkit only understands E/Z.
+    """
+    if not any(b.GetStereo() in _CIS_TRANS for b in rdmol.GetBonds()):
+        return rdmol
+    rdmol = Chem.Mol(rdmol)  # copy, indices/props are kept
+    rdCIPLabeler.AssignCIPLabels(rdmol)
+    for b in rdmol.GetBonds():
+        if b.GetStereo() in _CIS_TRANS and b.HasProp("_CIPCode"):
+            code = b.GetProp("_CIPCode")
+            if code == "E":
+                b.SetStereo(Chem.BondStereo.STEREOE)
+            elif code == "Z":
+                b.SetStereo(Chem.BondStereo.STEREOZ)
+    return rdmol
+
+
+@contextmanager
+def _openff_accepts_cis_trans():
+    """Temporarily patches Molecule.from_rdkit to accept cis/trans bond stereo."""
+    original = Molecule.__dict__["from_rdkit"]
+    orig_func = original.__func__
+
+    def _patched(cls, rdmol, *args, **kwargs):
+        return orig_func(cls, _cis_trans_to_e_z(rdmol), *args, **kwargs)
+
+    Molecule.from_rdkit = classmethod(_patched)
+    try:
+        yield
+    finally:
+        Molecule.from_rdkit = original
+
+
+def ptm_topology_from_pdb(protein, ptm_resdef):
+    """Loads a PDB containing a PTM residue into an OpenFF Topology."""
+    from openff.pablo import topology_from_pdb
+
+    with _openff_accepts_cis_trans():
+        topology = topology_from_pdb(protein, additional_definitions=[ptm_resdef])
+    topology.box_vectors = None
+    return topology

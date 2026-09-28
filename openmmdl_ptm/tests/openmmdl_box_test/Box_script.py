@@ -123,7 +123,7 @@ topology_openff = topology_from_pdb(
     protein,
     additional_definitions=[PTMresdef],
 )
-print("Complex topology has", topology_openff.getNumAtoms(), "atoms.")
+
 
 topology_openff.box_vectors = None
 
@@ -152,8 +152,13 @@ interchange = sage_ff14sb.create_interchange(topology_openff)
 # Prepare the Simulation
 
 print('Building system...')
-system = interchange.to_openmm_system(hydrogen_mass=hydrogenMass, ewald_tolerance=ewaldErrorTolerance)
+system = interchange.to_openmm_system(
+    hydrogen_mass=hydrogenMass.value_in_unit(unit.amu),
+    ewald_tolerance=ewaldErrorTolerance,
+)
 topology = interchange.to_openmm_topology()
+for residue in topology.residues():
+    residue.id = str(residue.id)
 positions = interchange.positions.to_openmm()
 positions_for_equil = np.array(positions.value_in_unit(unit.nanometers)) * unit.nanometers
 write_ligand_with_partial_charges(topology, system, positions, ligand_name=globals().get('ligand_name'), ligand_names=globals().get('ligand_names'), ligand_files=globals().get('ligands'))

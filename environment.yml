@@ -36,6 +36,9 @@ dependencies:
   - openff-toolkit
   - openff-interchange
   - openff-units
+  - openff-units
+  - rustworkx
+  - xdg
   # Add any additional runtime dependencies from pyproject.toml here
   # - package_name=version
 
