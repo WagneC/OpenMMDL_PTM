@@ -495,6 +495,9 @@ def _cis_trans_to_e_z(rdmol):
     if not any(b.GetStereo() in _CIS_TRANS for b in rdmol.GetBonds()):
         return rdmol
     rdmol = Chem.Mol(rdmol)  # copy, indices/props are kept
+    # reaction products are unsanitized, CIP labeling needs ring info and valences
+    rdmol.UpdatePropertyCache(strict=False)
+    Chem.FastFindRings(rdmol)
     rdCIPLabeler.AssignCIPLabels(rdmol)
     for b in rdmol.GetBonds():
         if b.GetStereo() in _CIS_TRANS and b.HasProp("_CIPCode"):
@@ -525,6 +528,18 @@ def _openff_accepts_cis_trans():
             Molecule.from_rdkit = saved
         else:
             del Molecule.from_rdkit
+
+
+def react_ptm_residue(res_resdef, lig_resdef, res_smarts, lig_smarts, ptm_smarts):
+    """Builds the PTM ResidueDefinition by reacting the residue with the ligand."""
+    from openff.pablo import ResidueDefinition
+
+    with _openff_accepts_cis_trans():
+        return ResidueDefinition.react(
+            reactants=[res_resdef, lig_resdef],
+            reactant_smarts=[res_smarts, lig_smarts],
+            product_smarts=[ptm_smarts],
+        )[0][0]
 
 
 def ptm_topology_from_pdb(protein, ptm_resdef):

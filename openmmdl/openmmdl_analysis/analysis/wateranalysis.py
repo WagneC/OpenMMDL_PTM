@@ -297,7 +297,8 @@ class StableWaters:
                     x, y, z = row["Oxygen_X"], row["Oxygen_Y"], row["Oxygen_Z"]
                     pdb_line = f"ATOM{index + 1:6}  O   WAT A{index + 1:4}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           O\n"
                     pdb_file.write(pdb_line)
-
+                    
+    @staticmethod
     def _find_interacting_residues(structure, representative_waters, distance_threshold):
         """
         This function maps waters (e.g. the representative waters) to interacting residues of a different PDB structure input.

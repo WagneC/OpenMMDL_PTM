@@ -1241,7 +1241,7 @@ def showAddHydrogens():
 @app.route("/addHydrogens", methods=["POST"])
 def addHydrogens():
     session["solvent"] = False
-    if "addHydrogens" in request.form:
+    if "addHydrogens" in request.form and not session.get("ptmMode"):
         pH = float(request.form.get("ph", "7"))
         fixer.addMissingHydrogens(pH)
     if "addWater" in request.form:
@@ -1415,6 +1415,41 @@ def downloadPackage():
     temp.seek(0, 0)
     return send_file(temp, "application/zip", True, "openmmdl_simulation.zip", max_age=0)
 
+@app.route("/ketcherReaction", methods=["POST"])
+def ketcherReaction():
+    from flask import jsonify
+    from rdkit import Chem
+    from rdkit.Chem import rdChemReactions
+
+    rxn_block = (request.get_json(silent=True) or {}).get("rxn", "")
+    try:
+        rxn = rdChemReactions.ReactionFromRxnBlock(rxn_block, sanitize=False, removeHs=False)
+    except Exception as e:
+        return jsonify(error=f"Reaktion konnte nicht gelesen werden: {e}"), 400
+
+    if rxn.GetNumReactantTemplates() != 2 or rxn.GetNumProductTemplates() != 1:
+        return jsonify(error="Erwartet: Residue + Ligand >> Produkt (2 Edukte, 1 Produkt)."), 400
+
+    res, lig = rxn.GetReactantTemplate(0), rxn.GetReactantTemplate(1)
+    prod = rxn.GetProductTemplate(0)
+
+    def maps(mol):
+        return [a.GetAtomMapNum() for a in mol.GetAtoms()]
+
+    if 0 in maps(prod):
+        return jsonify(error="Alle Atome im Produkt müssen gemappt sein."), 400
+    if set(maps(res)) & set(maps(lig)) - {0}:
+        return jsonify(error="Mapping-Nummern kommen in beiden Edukten vor."), 400
+    missing = set(maps(prod)) - set(maps(res)) - set(maps(lig))
+    if missing:
+        return jsonify(error=f"Produkt-Atome ohne Partner im Edukt: {sorted(missing)}"), 400
+
+    return jsonify(
+        res=Chem.MolToSmarts(res),
+        lig=Chem.MolToSmarts(lig),
+        product=Chem.MolToSmarts(prod),
+    )
+
 
 def configureDefaultOptions():
     """Select default options based on the file format and force field."""
@@ -1536,7 +1571,7 @@ os.chdir(outputDir)""")
         "from openmmdl.openmmdl_simulation.scripts.forcefield_water import ff_selection, water_forcefield_selection, water_model_selection, generate_forcefield, generate_transitional_forcefield"
     )
     script.append(
-        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, ptm_topology_from_pdb, solvate_topol_absolute_openff, rename_openff_solvent, get_ptm_residue_name, load_reference_forcefield"
+        "from openmmdl.openmmdl_simulation.scripts.protein_ligand_prep import prepare_ligand, rdkit_to_openmm, merge_protein_and_ligand, water_padding_solvent_builder, water_absolute_solvent_builder, membrane_builder, water_conversion, write_ligand_with_partial_charges, solvate_topol_padding_openff, ptm_topology_from_pdb, react_ptm_residue, solvate_topol_absolute_openff, rename_openff_solvent, get_ptm_residue_name, load_reference_forcefield"
     )
     script.append(
         "from openmmdl.openmmdl_simulation.scripts.post_md_conversions import mdtraj_conversion, MDanalysis_conversion"
@@ -1612,16 +1647,8 @@ os.chdir(outputDir)""")
 
 LIGresdef = ResidueDefinition.anon_from_sdf(ligand)
 RESresdef = STD_CCD_CACHE[RESname][0]
-PTMresdef = ResidueDefinition.react(
-    reactants=[RESresdef, LIGresdef],
-    reactant_smarts=[
-        RESsmiles,
-        LIGsmiles,
-    ],
-    product_smarts=[
-        PTMsmiles,
-    ],
-)[0][0]""")
+PTMresdef = react_ptm_residue(RESresdef, LIGresdef, RESsmiles, LIGsmiles, PTMsmiles)
+""")
             elif has_pdb_ligands:
                 ligand_paths = []
                 if session["sdfFile"] != "":

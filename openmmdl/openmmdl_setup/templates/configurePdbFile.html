@@ -76,6 +76,34 @@ Select the pdb input file and options for how to model it.
             </div>
         </div>
         <div class="form-group">
+            <div class="col-md-offset-2 col-md-10">
+                <button type="button" class="btn btn-default" onclick="openKetcher()">
+                    Reaktion in Ketcher zeichnen
+                </button>
+                <input type="hidden" name="ptmReactionRxn" id="ptmReactionRxn"/>
+            </div>
+        </div>
+
+        <div class="modal fade" id="ketcherModal" tabindex="-1">
+        <div class="modal-dialog modal-lg" style="width:90%">
+            <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">PTM-Reaktion zeichnen: Residue + Ligand &gt;&gt; Produkt</h4>
+            </div>
+            <div class="modal-body" style="height:70vh; padding:0">
+                <iframe id="ketcherFrame"
+                        data-src="{{ url_for('static', filename='ketcher/index.html') }}"
+                        style="width:100%; height:100%; border:0"></iframe>
+            </div>
+            <div class="modal-footer">
+                <span id="ketcherError" class="text-danger pull-left"></span>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="applyKetcherReaction()">Übernehmen</button>
+            </div>
+            </div>
+        </div>
+        </div>
+        <div class="form-group">
             <label for="ptmResSmiles" class="control-label col-md-2">Residue SMARTS</label>
             <div class="col-md-10"><input type="text" name="ptmResSmiles" id="ptmResSmiles" class="form-control" placeholder="[C:10]-[S:1]-[H:2]"/></div>
         </div>
@@ -368,6 +396,42 @@ function removeCompanionRow(index) {
         row.remove();
     syncCompanionRowHeights();
     optionChanged();
+}
+
+function getKetcher() {
+    return document.getElementById("ketcherFrame").contentWindow.ketcher;
+}
+
+function openKetcher() {
+    var frame = document.getElementById("ketcherFrame");
+    // Erst beim Öffnen laden, sonst rendert Ketcher im versteckten Modal mit Größe 0
+    if (!frame.src) frame.src = frame.dataset.src;
+    $("#ketcherModal").modal("show");
+}
+
+async function applyKetcherReaction() {
+    var err = document.getElementById("ketcherError");
+    err.textContent = "";
+    var rxn;
+    try {
+        rxn = await getKetcher().getRxn();   // wirft einen Fehler, wenn kein Reaktionspfeil gezeichnet ist
+    } catch (e) {
+        err.textContent = "Bitte eine Reaktion mit Pfeil zeichnen.";
+        return;
+    }
+    var resp = await fetch("{{ url_for('ketcherReaction') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({rxn: rxn})
+    });
+    var data = await resp.json();
+    if (!resp.ok) { err.textContent = data.error; return; }
+
+    document.getElementById("ptmResSmiles").value = data.res;
+    document.getElementById("ptmLigSmiles").value = data.lig;
+    document.getElementById("ptmProductSmiles").value = data.product;
+    document.getElementById("ptmReactionRxn").value = rxn;  // optional: später wieder laden
+    $("#ketcherModal").modal("hide");
 }
 
 var lastForcefield = null;
