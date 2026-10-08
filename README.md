@@ -75,6 +75,11 @@ After installation, activate the conda environment:
 
     pip install .
 
+After installation, add ketcher manually:
+
+    cd OpenMMDL
+    bash dectools/scripts/fetch_ketcher.sh
+
 ## Check your installation
 
 After installing **OpenMMDL**, you can check whether the entry points

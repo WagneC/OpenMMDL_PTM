@@ -55,6 +55,9 @@ parser = argparse.ArgumentParser(description="Creates a conda environment from f
 parser.add_argument("-n", "--name", type=str, help="The name of the created Python environment")
 parser.add_argument("-p", "--python", type=str, help="The version of the created Python environment")
 parser.add_argument("conda_file", help="The file for the created Python environment")
+parser.add_argument("--skip-ketcher", action="store_true", help="Do not download the Ketcher standalone build")
+
+args = parser.parse_args()
 
 args = parser.parse_args()
 
@@ -95,3 +98,14 @@ with temp_cd():
     with open(temp_file_name, "w") as f:
         f.write(yaml.dump(yaml_script))
     sp.call("{} env create -n {} -f {}".format(conda_path, args.name, temp_file_name), shell=True)
+
+# Download the Ketcher standalone build into openmmdl/openmmdl_setup/static/ketcher
+KETCHER_VERSION = "3.18.0"
+
+if not args.skip_ketcher:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    fetch_script = os.path.join(repo_root, "devtools/scripts", "fetch_ketcher.sh")
+    if not os.path.isfile(fetch_script):
+        raise RuntimeError("Could not find Ketcher fetch script at {}".format(fetch_script))
+    print("KETCHER VERSION {}".format(KETCHER_VERSION))
+    sp.run(["bash", fetch_script, KETCHER_VERSION], check=True)
