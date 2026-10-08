@@ -1415,39 +1415,64 @@ def downloadPackage():
     temp.seek(0, 0)
     return send_file(temp, "application/zip", True, "openmmdl_simulation.zip", max_age=0)
 
+def _rxn_block_to_smarts(rxn_block):
+    """Splits a RXN block (e.g. from Ketcher) into reactant and product molecules."""
+    header, *mol_blocks = rxn_block.replace("\r\n", "\n").split("$MOL")
+    counts = header.strip("\n").splitlines()[-1]
+    n_reactants, n_products = int(counts[0:3]), int(counts[3:6])
+
+    mols = []
+    for block in mol_blocks:
+        # Only remove the line break after "$MOL", the (possibly empty) name line belongs to the molfile
+        mol = Chem.MolFromMolBlock(block.split("\n", 1)[1], sanitize=False, removeHs=False)
+        if mol is None:
+            raise ValueError("Could not read a molecule of the reaction.")
+        mol.UpdatePropertyCache(strict=False)
+        Chem.AssignChiralTypesFromBondDirs(mol)          # wedge bonds -> @/@@
+        Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+        mols.append(mol)
+    return mols[:n_reactants], mols[n_reactants:n_reactants + n_products]
+
+
+def _mol_to_smarts(mol):
+    """Writes e.g. [C:10]-[S:1]-[H:2] instead of [#6:10]-[#16:1]-[#1:2]."""
+    for atom in mol.GetAtoms():
+        atom.SetNoImplicit(True)    # no hydrogen count: [C:10] instead of [CH3:10]
+        atom.SetNumExplicitHs(0)
+    return Chem.MolToSmiles(mol, allBondsExplicit=True, canonical=False)
+
+
 @app.route("/ketcherReaction", methods=["POST"])
 def ketcherReaction():
     from flask import jsonify
-    from rdkit import Chem
-    from rdkit.Chem import rdChemReactions
 
     rxn_block = (request.get_json(silent=True) or {}).get("rxn", "")
     try:
-        rxn = rdChemReactions.ReactionFromRxnBlock(rxn_block, sanitize=False, removeHs=False)
+        reactants, products = _rxn_block_to_smarts(rxn_block)
     except Exception as e:
-        return jsonify(error=f"Reaktion konnte nicht gelesen werden: {e}"), 400
+        return jsonify(error=f"Could not read the reaction: {e}"), 400
 
-    if rxn.GetNumReactantTemplates() != 2 or rxn.GetNumProductTemplates() != 1:
-        return jsonify(error="Erwartet: Residue + Ligand >> Produkt (2 Edukte, 1 Produkt)."), 400
+    if len(reactants) != 2 or len(products) != 1:
+        return jsonify(error="Expected: residue + ligand >> product (2 reactants, 1 product)."), 400
 
-    res, lig = rxn.GetReactantTemplate(0), rxn.GetReactantTemplate(1)
-    prod = rxn.GetProductTemplate(0)
+    res, lig = reactants
+    prod = products[0]
 
     def maps(mol):
         return [a.GetAtomMapNum() for a in mol.GetAtoms()]
 
     if 0 in maps(prod):
-        return jsonify(error="Alle Atome im Produkt müssen gemappt sein."), 400
+        return jsonify(error="All atoms of the product must be mapped."), 400
     if set(maps(res)) & set(maps(lig)) - {0}:
-        return jsonify(error="Mapping-Nummern kommen in beiden Edukten vor."), 400
+        return jsonify(error="Atom map numbers occur in both reactants."), 400
     missing = set(maps(prod)) - set(maps(res)) - set(maps(lig))
     if missing:
-        return jsonify(error=f"Produkt-Atome ohne Partner im Edukt: {sorted(missing)}"), 400
+        return jsonify(error=f"Product atoms without a partner in the reactants: {sorted(missing)}"), 400
 
     return jsonify(
-        res=Chem.MolToSmarts(res),
-        lig=Chem.MolToSmarts(lig),
-        product=Chem.MolToSmarts(prod),
+        res=_mol_to_smarts(res),
+        lig=_mol_to_smarts(lig),
+        product=_mol_to_smarts(prod),
     )
 
 

@@ -78,7 +78,7 @@ Select the pdb input file and options for how to model it.
         <div class="form-group">
             <div class="col-md-offset-2 col-md-10">
                 <button type="button" class="btn btn-default" onclick="openKetcher()">
-                    Reaktion in Ketcher zeichnen
+                    Draw Reaction
                 </button>
                 <input type="hidden" name="ptmReactionRxn" id="ptmReactionRxn"/>
             </div>
@@ -88,7 +88,7 @@ Select the pdb input file and options for how to model it.
         <div class="modal-dialog modal-lg" style="width:90%">
             <div class="modal-content">
             <div class="modal-header">
-                <h4 class="modal-title">PTM-Reaktion zeichnen: Residue + Ligand &gt;&gt; Produkt</h4>
+                <h4 class="modal-title">Draw and Map the Reacting Atoms: Residue + Ligand &gt;&gt; Product</h4>
             </div>
             <div class="modal-body" style="height:70vh; padding:0">
                 <iframe id="ketcherFrame"
@@ -97,8 +97,8 @@ Select the pdb input file and options for how to model it.
             </div>
             <div class="modal-footer">
                 <span id="ketcherError" class="text-danger pull-left"></span>
-                <button type="button" class="btn btn-default" data-dismiss="modal">Abbrechen</button>
-                <button type="button" class="btn btn-primary" onclick="applyKetcherReaction()">Übernehmen</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="applyKetcherReaction()">Apply</button>
             </div>
             </div>
         </div>
@@ -416,7 +416,7 @@ async function applyKetcherReaction() {
     try {
         rxn = await getKetcher().getRxn();   // wirft einen Fehler, wenn kein Reaktionspfeil gezeichnet ist
     } catch (e) {
-        err.textContent = "Bitte eine Reaktion mit Pfeil zeichnen.";
+        err.textContent = "Please draw a reaction with an arrow: residue + ligand >> product.";
         return;
     }
     var resp = await fetch("{{ url_for('ketcherReaction') }}", {
